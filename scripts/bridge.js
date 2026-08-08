@@ -3,7 +3,7 @@
 // Replaces Shadowdark's native HP scrolling text with standalone bouncing text.
 
 const MODULE_ID = "mk-damage-numbers";
-const MODULE_VERSION = "2.0.0";
+const MODULE_VERSION = "2.0.1";
 
 const DEFAULT_FONT = "Signika";
 const DEFAULT_FONT_SIZE = 48;
@@ -26,11 +26,12 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, "fontFamily", {
     name: "Font Family",
-    hint: "Font family used for bouncing damage and healing numbers.",
+    hint: "Font family used for bouncing damage and healing numbers. Lists fonts available in Foundry.",
     scope: "world",
     config: true,
     type: String,
-    default: DEFAULT_FONT
+    default: DEFAULT_FONT,
+    choices: getAvailableFontChoices()
   });
 
   game.settings.register(MODULE_ID, "fontSize", {
@@ -53,6 +54,17 @@ Hooks.once("init", () => {
     range: { min: -1, max: 1, step: 0.05 }
   });
 });
+
+function getAvailableFontChoices() {
+  const FontConfigClass = foundry.applications?.settings?.menus?.FontConfig
+    ?? globalThis.FontConfig;
+  const availableChoices = FontConfigClass?.getAvailableFontChoices?.() ?? {};
+
+  return {
+    [DEFAULT_FONT]: DEFAULT_FONT,
+    ...availableChoices
+  };
+}
 
 /* ---------------------------------------- */
 /*  Ready: Install Overrides                */

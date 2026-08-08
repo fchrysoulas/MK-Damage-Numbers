@@ -11,7 +11,7 @@ No additional modules are required.
 
 - Foundry VTT: v13-v14
 - Shadowdark RPG: v4.0.0 or later
-- Module version: 2.0.0
+- Module version: 2.0.1
 
 ## Features
 
@@ -57,13 +57,16 @@ Configure Settings > Module Settings > MK Damage Numbers
 
 Available world settings:
 
-- **Font Family**: font used for damage and healing numbers.
+- **Font Family**: dropdown listing the fonts currently available in Foundry.
 - **Font Size**: fixed text size in pixels.
 - **Vertical Origin Offset**: starting height relative to token height.
   Negative values move the number higher.
 
 Shadowdark's own **Animate HP Change** setting remains the master switch. When
 that setting is disabled, MK Damage Numbers does not animate HP changes.
+
+Each damage or healing number is displayed for **1.7 seconds**. It begins
+fading after **0.85 seconds** and is removed when the animation completes.
 
 ## Implementation Notes
 
@@ -92,4 +95,3 @@ See [CHANGELOG.md](CHANGELOG.md).
 ## License
 
 MK Damage Numbers is released under the MIT License. See [LICENSE](LICENSE).
-

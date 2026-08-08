@@ -4,7 +4,14 @@ All notable changes to MK Damage Numbers are documented here.
 
 ## Unreleased
 
-## 2.0.0 - 2026-08-09
+## 2.0.1
+
+- Replaced the free-text font-family setting with a dropdown populated from
+  Foundry's available fonts.
+- Documented the 1.7-second animation display duration and 0.85-second fade
+  start.
+
+## 2.0.0
 
 - Removed the RPG Damage Numbers dependency and compatibility shim.
 - Added a standalone canvas animation with pop-in scaling, randomized arc,
@@ -25,4 +32,3 @@ All notable changes to MK Damage Numbers are documented here.
 - Added world settings for font family, font size, and vertical origin.
 - Replaced Shadowdark's native HP scrolling text while preserving its Token
   Ring flash and defeated-token behavior.
-
