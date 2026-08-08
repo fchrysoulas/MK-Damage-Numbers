@@ -22,6 +22,7 @@ temp/
 # Foundry release output
 dist/
 *.zip
+*.ps1
 
 # Environment overrides
 .env
