@@ -71,25 +71,6 @@ that setting is disabled, MK Damage Numbers does not animate HP changes.
 The default animation duration is **1.7 seconds**, with fading beginning after
 **0.85 seconds**.
 
-## Implementation Notes
-
-The animation is rendered locally on each connected client's Foundry canvas.
-It uses Shadowdark's actor update workflow, so it does not require a custom
-socket or a third-party animation module.
-
-The module integrates with Shadowdark's private HP animation method. Runtime
-feature checks prevent installation errors if that method changes, but a future
-major Shadowdark update may require a compatibility update.
-
-## Development
-
-The module has no build dependencies. Basic validation:
-
-```powershell
-node --check scripts/bridge.js
-Get-Content -Raw module.json | ConvertFrom-Json | Out-Null
-git diff --check
-```
 
 ## Changelog
 
