@@ -1,0 +1,31 @@
+{
+  "id": "mk-damage-numbers",
+  "title": "MK Damage Numbers",
+  "description": "Replaces Shadowdark's native HP scrolling text with RPG Damage Numbers and provides GM-controlled world settings for font, size, and vertical origin.",
+  "version": "1.1.0",
+  "compatibility": {
+    "minimum": 13,
+    "verified": 13,
+    "maximum": 13
+  },
+  "authors": [
+    {
+      "name": "Fotis"
+    }
+  ],
+  "esmodules": [
+    "scripts/bridge.js"
+  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "damage-numbers",
+        "type": "module"
+      },
+      {
+        "id": "shadowdark",
+        "type": "system"
+      }
+    ]
+  }
+}
