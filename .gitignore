@@ -1,0 +1,29 @@
+# OS and editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# Local agent and IDE state
+.agents/
+.codex/
+.vscode/
+.idea/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Foundry release output
+dist/
+*.zip
+
+# Environment overrides
+.env
+.env.*
+!.env.example

@@ -1,19 +1,21 @@
 // modules/mk-damage-numbers/scripts/bridge.js
-// Foundry VTT v13 + Shadowdark v4+
-// Replaces Shadowdark's native HP scrolling text with RPG Damage Numbers.
-
-import { DamageNumberHelpers } from "/modules/damage-numbers/scripts/helpers.js";
-import { DamageNumber } from "/modules/damage-numbers/scripts/DamageNumbers.js";
+// Foundry VTT v13-v14 + Shadowdark v4+
+// Replaces Shadowdark's native HP scrolling text with standalone bouncing text.
 
 const MODULE_ID = "mk-damage-numbers";
-const MODULE_VERSION = "1.1.0";
+const MODULE_VERSION = "2.0.0";
 
 const DEFAULT_FONT = "Signika";
 const DEFAULT_FONT_SIZE = 48;
 const DEFAULT_ORIGIN_OFFSET = -0.4;
 
-const STYLE_PATCH_FLAG = Symbol.for(`${MODULE_ID}.damageNumberStylePatched`);
 const SHADOWDARK_PATCH_FLAG = Symbol.for(`${MODULE_ID}.shadowdarkHpAnimationPatched`);
+const HP_ANIMATION_CALL_COUNT = Symbol.for(`${MODULE_ID}.hpAnimationCallCount`);
+
+const ACTIVE_ANIMATIONS = new Set();
+const FRAME_MS = 1000 / 60;
+const ANIMATION_DURATION_MS = 1700;
+const FADE_START_MS = 850;
 
 /* ---------------------------------------- */
 /*  Init: Settings                          */
@@ -24,23 +26,21 @@ Hooks.once("init", () => {
 
   game.settings.register(MODULE_ID, "fontFamily", {
     name: "Font Family",
-    hint: "Font family used for RPG damage and healing numbers.",
+    hint: "Font family used for bouncing damage and healing numbers.",
     scope: "world",
     config: true,
     type: String,
-    default: DEFAULT_FONT,
-    restricted: true
+    default: DEFAULT_FONT
   });
 
   game.settings.register(MODULE_ID, "fontSize", {
     name: "Font Size",
-    hint: "Fixed font size in pixels for RPG damage and healing numbers.",
+    hint: "Fixed font size in pixels for bouncing damage and healing numbers.",
     scope: "world",
     config: true,
     type: Number,
     default: DEFAULT_FONT_SIZE,
-    range: { min: 12, max: 128, step: 1 },
-    restricted: true
+    range: { min: 12, max: 128, step: 1 }
   });
 
   game.settings.register(MODULE_ID, "originOffset", {
@@ -50,13 +50,8 @@ Hooks.once("init", () => {
     config: true,
     type: Number,
     default: DEFAULT_ORIGIN_OFFSET,
-    range: { min: -1, max: 1, step: 0.05 },
-    restricted: true
+    range: { min: -1, max: 1, step: 0.05 }
   });
-
-  // Compatibility for versions of RPG Damage Numbers whose core scrolling-text
-  // wrapper expects DamageNumberHelpers to exist as a global identifier.
-  globalThis.DamageNumberHelpers = DamageNumberHelpers;
 });
 
 /* ---------------------------------------- */
@@ -66,92 +61,8 @@ Hooks.once("init", () => {
 Hooks.once("ready", () => {
   if (game.system.id !== "shadowdark") return;
 
-  installDamageNumberStyleOverride();
   installShadowdarkHpAnimationReplacement();
 });
-
-/* ---------------------------------------- */
-/*  RPG Damage Numbers Style                */
-/* ---------------------------------------- */
-
-function installDamageNumberStyleOverride() {
-  const proto = DamageNumber?.prototype;
-
-  if (!proto) {
-    console.error(`${MODULE_ID} | DamageNumber prototype was not found.`);
-    return;
-  }
-
-  if (proto[STYLE_PATCH_FLAG]) return;
-
-  if (typeof proto.getText !== "function") {
-    console.error(`${MODULE_ID} | DamageNumber.getText() was not found.`);
-    return;
-  }
-
-  const originalGetText = proto.getText;
-
-  proto.getText = function (...args) {
-    const textSprite = originalGetText.apply(this, args);
-
-    if (textSprite?.style) {
-      const fontFamily = String(
-        game.settings.get(MODULE_ID, "fontFamily") || DEFAULT_FONT
-      );
-
-      const configuredSize = Number(
-        game.settings.get(MODULE_ID, "fontSize")
-      );
-
-      const fontSize = Number.isFinite(configuredSize) && configuredSize > 0
-        ? configuredSize
-        : DEFAULT_FONT_SIZE;
-
-      textSprite.style.fontFamily = fontFamily;
-      textSprite.style.fontSize = fontSize;
-
-      // PIXI text objects need to be marked dirty after changing their style.
-      if ("dirty" in textSprite) textSprite.dirty = true;
-      if (typeof textSprite.updateText === "function") textSprite.updateText();
-    }
-
-    return textSprite;
-  };
-
-  if (typeof proto.animate === "function") {
-    const originalAnimate = proto.animate;
-
-    proto.animate = async function (...args) {
-      try {
-        if (this.token && this.sprite) {
-          const configuredOffset = Number(
-            game.settings.get(MODULE_ID, "originOffset")
-          );
-
-          const offsetFactor = Number.isFinite(configuredOffset)
-            ? configuredOffset
-            : DEFAULT_ORIGIN_OFFSET;
-
-          const tokenHeightPx = getTokenHeightPx(this.token);
-          this.sprite.y += tokenHeightPx * offsetFactor;
-        }
-      }
-      catch (error) {
-        console.error(`${MODULE_ID} | Failed to apply origin offset.`, error);
-      }
-
-      return originalAnimate.apply(this, args);
-    };
-  }
-
-  Object.defineProperty(proto, STYLE_PATCH_FLAG, {
-    value: true,
-    configurable: false,
-    enumerable: false
-  });
-
-  console.log(`${MODULE_ID} | RPG Damage Numbers style override installed.`);
-}
 
 function getTokenHeightPx(token) {
   const placeableHeight = Number(token?.h);
@@ -163,6 +74,120 @@ function getTokenHeightPx(token) {
   const documentHeight = Number(token?.document?.height) || 1;
   return documentHeight * gridSize;
 }
+
+/* ---------------------------------------- */
+/*  Standalone Bouncing Text                */
+/* ---------------------------------------- */
+
+function createBouncingDamageNumber(token, delta, color) {
+  const TextClass = foundry.canvas?.containers?.PreciseText;
+  const ticker = canvas?.app?.ticker;
+
+  if (!TextClass || !ticker || !canvas?.interface || !token?.center) {
+    console.error(`${MODULE_ID} | Canvas text animation API was not found.`);
+    return;
+  }
+
+  const configuredSize = Number(game.settings.get(MODULE_ID, "fontSize"));
+  const fontSize = Number.isFinite(configuredSize) && configuredSize > 0
+    ? configuredSize
+    : DEFAULT_FONT_SIZE;
+
+  const configuredOffset = Number(game.settings.get(MODULE_ID, "originOffset"));
+  const offsetFactor = Number.isFinite(configuredOffset)
+    ? configuredOffset
+    : DEFAULT_ORIGIN_OFFSET;
+
+  const fontFamily = String(
+    game.settings.get(MODULE_ID, "fontFamily") || DEFAULT_FONT
+  );
+
+  const value = Math.abs(Math.trunc(delta));
+  const text = new TextClass(String(value), {
+    align: "center",
+    dropShadow: true,
+    fill: color,
+    fontFamily,
+    fontSize,
+    fontWeight: "bold",
+    stroke: 0x000000,
+    strokeThickness: Math.max(3, Math.round(fontSize / 12))
+  });
+
+  text.anchor.set(0.5, 0.5);
+  text.zIndex = CONFIG.Canvas?.groups?.interface?.zIndexScrollingText ?? 0;
+
+  const tokenHeight = getTokenHeightPx(token);
+  const startX = Number(token.center.x);
+  const startY = Number(token.center.y) + (tokenHeight * offsetFactor);
+  const floorY = startY + Math.min(tokenHeight * 0.15, fontSize * 0.5);
+
+  text.position.set(startX, startY);
+  text.scale.set(0.65);
+  canvas.interface.addChild(text);
+
+  let elapsed = 0;
+  let velocityX = (Math.random() - 0.5) * 4.2;
+  let velocityY = -(4.6 + (Math.random() * 1.8));
+  const gravity = 0.15 + (Math.random() * 0.035);
+  let bouncesRemaining = 1;
+  let cleaned = false;
+
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    ticker.remove(tick);
+    ACTIVE_ANIMATIONS.delete(cleanup);
+    if (text.parent) text.parent.removeChild(text);
+    if (!text.destroyed) text.destroy();
+  };
+
+  const tick = () => {
+    if (!canvas?.ready || text.destroyed || !text.parent) {
+      cleanup();
+      return;
+    }
+
+    const deltaMs = Number(ticker.deltaMS) || FRAME_MS;
+    const frameDelta = Math.min(deltaMs / FRAME_MS, 3);
+    elapsed += deltaMs;
+
+    velocityY += gravity * frameDelta;
+    text.x += velocityX * frameDelta;
+    text.y += velocityY * frameDelta;
+
+    if (bouncesRemaining > 0 && velocityY > 0 && text.y >= floorY) {
+      text.y = floorY;
+      velocityY = -(2.2 + (Math.random() * 0.7));
+      velocityX *= 0.65;
+      bouncesRemaining -= 1;
+    }
+
+    if (elapsed < 120) {
+      const progress = elapsed / 120;
+      text.scale.set(0.65 + (0.5 * progress));
+    }
+    else if (elapsed < 260) {
+      const progress = (elapsed - 120) / 140;
+      text.scale.set(1.15 - (0.15 * progress));
+    }
+    else if (elapsed > FADE_START_MS) {
+      const fadeProgress = (elapsed - FADE_START_MS)
+        / (ANIMATION_DURATION_MS - FADE_START_MS);
+      text.alpha = Math.max(0, 1 - fadeProgress);
+      text.scale.set(Math.max(0.75, 1 - (fadeProgress * 0.15)));
+    }
+
+    if (elapsed >= ANIMATION_DURATION_MS || text.alpha <= 0) cleanup();
+  };
+
+  ACTIVE_ANIMATIONS.add(cleanup);
+  ticker.add(tick);
+}
+
+Hooks.on("canvasTearDown", () => {
+  for (const cleanup of Array.from(ACTIVE_ANIMATIONS)) cleanup();
+});
 
 /* ---------------------------------------- */
 /*  Shadowdark HP Animation Replacement     */
@@ -182,7 +207,7 @@ function installShadowdarkHpAnimationReplacement() {
   if (typeof proto._animateHpChange !== "function") {
     console.error(
       `${MODULE_ID} | Shadowdark _animateHpChange() was not found. ` +
-      `This bridge expects Shadowdark v4+ on Foundry VTT v13.`
+      `This bridge expects Shadowdark v4+ on Foundry VTT v13-v14.`
     );
     return;
   }
@@ -197,14 +222,10 @@ function installShadowdarkHpAnimationReplacement() {
    * Shadowdark delta convention:
    *   delta < 0 -> damage
    *   delta > 0 -> healing
-   *
-   * RPG Damage Numbers simple helper convention:
-   *   healthDiff > 0 -> damage
-   *   healthDiff < 0 -> healing
-   *
-   * Therefore healthDiff = -delta.
    */
   proto._animateHpChange = function (delta) {
+    this[HP_ANIMATION_CALL_COUNT] = (this[HP_ANIMATION_CALL_COUNT] ?? 0) + 1;
+
     if (!Number.isFinite(delta) || delta === 0) return;
 
     // Preserve Shadowdark's own Animate HP Change world setting.
@@ -229,12 +250,11 @@ function installShadowdarkHpAnimationReplacement() {
         // Preserve Shadowdark's Dynamic Token Ring flash.
         flashTokenRing(tokenDoc, isDamage);
 
-        // Completely replace Shadowdark's native createScrollingText() call
-        // with the RPG Damage Numbers animation.
-        DamageNumberHelpers.executeSimpleDamageNumbers(
-          tokenDoc.id,
-          -delta
-        );
+        const color = isDamage
+          ? CONFIG.SHADOWDARK?.TOKEN_HP_COLORS?.damage ?? 0xffffff
+          : CONFIG.SHADOWDARK?.TOKEN_HP_COLORS?.healing ?? 0x00ff00;
+
+        createBouncingDamageNumber(tokenDoc.object, delta, color);
       }
     }
     catch (error) {
@@ -245,11 +265,12 @@ function installShadowdarkHpAnimationReplacement() {
   // Shadowdark v4 currently gates its native _animateHpChange call with a
   // truthy HP-value check, so an update that lands exactly on 0 HP can skip
   // the animation. Preserve the system workflow, but fill that one gap so a
-  // lethal hit still gets an RPG damage number.
+  // lethal hit still gets a bouncing damage number.
   if (typeof proto._onUpdate === "function") {
     const originalOnUpdate = proto._onUpdate;
 
     proto._onUpdate = async function (data, options, userId) {
+      const animationCallsBefore = this[HP_ANIMATION_CALL_COUNT] ?? 0;
       const result = await originalOnUpdate.call(this, data, options, userId);
 
       const previousHp = Number(options?.shadowdark?.prevHpValue);
@@ -259,7 +280,8 @@ function installShadowdarkHpAnimationReplacement() {
         Number.isFinite(previousHp) &&
         Number.isFinite(currentHp) &&
         currentHp === 0 &&
-        previousHp !== 0
+        previousHp !== 0 &&
+        (this[HP_ANIMATION_CALL_COUNT] ?? 0) === animationCallsBefore
       ) {
         this._animateHpChange(currentHp - previousHp);
       }
@@ -275,7 +297,7 @@ function installShadowdarkHpAnimationReplacement() {
   });
 
   console.log(
-    `${MODULE_ID} | Shadowdark native HP scrolling text replaced with RPG Damage Numbers.`
+    `${MODULE_ID} | Shadowdark HP scrolling text replaced with standalone bouncing numbers.`
   );
 }
 
@@ -297,7 +319,7 @@ function flashTokenRing(tokenDoc, isDamage) {
         }
       : {};
 
-    ring.flashColor(Color.from(colorValue), animation);
+    ring.flashColor(foundry.utils.Color.from(colorValue), animation);
   }
   catch (error) {
     // Ring flashing is cosmetic. Do not prevent damage numbers if it fails.
