@@ -3,19 +3,20 @@
 // Replaces Shadowdark's native HP scrolling text with standalone bouncing text.
 
 const MODULE_ID = "mk-damage-numbers";
-const MODULE_VERSION = "2.0.1";
+const MODULE_VERSION = "2.0.2";
 
 const DEFAULT_FONT = "Signika";
 const DEFAULT_FONT_SIZE = 48;
 const DEFAULT_ORIGIN_OFFSET = -0.4;
+const DEFAULT_ANIMATION_DURATION_SECONDS = 1.7;
+const MIN_ANIMATION_DURATION_SECONDS = 0.5;
+const MAX_ANIMATION_DURATION_SECONDS = 5;
 
 const SHADOWDARK_PATCH_FLAG = Symbol.for(`${MODULE_ID}.shadowdarkHpAnimationPatched`);
 const HP_ANIMATION_CALL_COUNT = Symbol.for(`${MODULE_ID}.hpAnimationCallCount`);
 
 const ACTIVE_ANIMATIONS = new Set();
 const FRAME_MS = 1000 / 60;
-const ANIMATION_DURATION_MS = 1700;
-const FADE_START_MS = 850;
 
 /* ---------------------------------------- */
 /*  Init: Settings                          */
@@ -44,6 +45,20 @@ Hooks.once("init", () => {
     range: { min: 12, max: 128, step: 1 }
   });
 
+  game.settings.register(MODULE_ID, "animationDuration", {
+    name: "Animation Duration",
+    hint: "How long each damage or healing number remains visible, in seconds. Fading begins halfway through.",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: DEFAULT_ANIMATION_DURATION_SECONDS,
+    range: {
+      min: MIN_ANIMATION_DURATION_SECONDS,
+      max: MAX_ANIMATION_DURATION_SECONDS,
+      step: 0.1
+    }
+  });
+
   game.settings.register(MODULE_ID, "originOffset", {
     name: "Vertical Origin Offset",
     hint: "Starting height relative to token height. Negative values move the numbers higher.",
@@ -66,11 +81,20 @@ function getAvailableFontChoices() {
   };
 }
 
+function refreshAvailableFontChoices() {
+  const setting = game.settings.settings.get(`${MODULE_ID}.fontFamily`);
+  if (!setting) return;
+
+  setting.choices = getAvailableFontChoices();
+}
+
 /* ---------------------------------------- */
 /*  Ready: Install Overrides                */
 /* ---------------------------------------- */
 
 Hooks.once("ready", () => {
+  refreshAvailableFontChoices();
+
   if (game.system.id !== "shadowdark") return;
 
   installShadowdarkHpAnimationReplacement();
@@ -109,6 +133,18 @@ function createBouncingDamageNumber(token, delta, color) {
   const offsetFactor = Number.isFinite(configuredOffset)
     ? configuredOffset
     : DEFAULT_ORIGIN_OFFSET;
+
+  const configuredDuration = Number(
+    game.settings.get(MODULE_ID, "animationDuration")
+  );
+  const durationSeconds = Number.isFinite(configuredDuration)
+    ? Math.min(
+        MAX_ANIMATION_DURATION_SECONDS,
+        Math.max(MIN_ANIMATION_DURATION_SECONDS, configuredDuration)
+      )
+    : DEFAULT_ANIMATION_DURATION_SECONDS;
+  const animationDurationMs = durationSeconds * 1000;
+  const fadeStartMs = animationDurationMs / 2;
 
   const fontFamily = String(
     game.settings.get(MODULE_ID, "fontFamily") || DEFAULT_FONT
@@ -183,14 +219,14 @@ function createBouncingDamageNumber(token, delta, color) {
       const progress = (elapsed - 120) / 140;
       text.scale.set(1.15 - (0.15 * progress));
     }
-    else if (elapsed > FADE_START_MS) {
-      const fadeProgress = (elapsed - FADE_START_MS)
-        / (ANIMATION_DURATION_MS - FADE_START_MS);
+    else if (elapsed > fadeStartMs) {
+      const fadeProgress = (elapsed - fadeStartMs)
+        / (animationDurationMs - fadeStartMs);
       text.alpha = Math.max(0, 1 - fadeProgress);
       text.scale.set(Math.max(0.75, 1 - (fadeProgress * 0.15)));
     }
 
-    if (elapsed >= ANIMATION_DURATION_MS || text.alpha <= 0) cleanup();
+    if (elapsed >= animationDurationMs || text.alpha <= 0) cleanup();
   };
 
   ACTIVE_ANIMATIONS.add(cleanup);

@@ -4,6 +4,14 @@ All notable changes to MK Damage Numbers are documented here.
 
 ## Unreleased
 
+## 2.0.2
+
+- Refresh the font-family dropdown after world fonts load so additional fonts
+  configured for the current world are included.
+- Added an Animation Duration world setting with a range of 0.5 to 5.0 seconds
+  and the existing 1.7-second timing as its default.
+- Updated the displayed module author name to Mikrokouneli.
+
 ## 2.0.1
 
 - Replaced the free-text font-family setting with a dropdown populated from
