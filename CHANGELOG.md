@@ -4,6 +4,9 @@ All notable changes to MK Damage Numbers are documented here.
 
 ## Unreleased
 
+- Added optional MK Stress integration with signed bouncing `+N` and `-N`
+  animations, without adding MK Stress as a required dependency.
+
 ## 2.0.2
 
 - Refresh the font-family dropdown after world fonts load so additional fonts

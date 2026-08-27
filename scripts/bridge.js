@@ -11,6 +11,10 @@ const DEFAULT_ORIGIN_OFFSET = -0.4;
 const DEFAULT_ANIMATION_DURATION_SECONDS = 1.7;
 const MIN_ANIMATION_DURATION_SECONDS = 0.5;
 const MAX_ANIMATION_DURATION_SECONDS = 5;
+const STRESS_GAIN_FILL = 0x000000;
+const STRESS_GAIN_STROKE = 0xffffff;
+const STRESS_LOSS_FILL = 0xffffff;
+const STRESS_LOSS_STROKE = 0x000000;
 
 const SHADOWDARK_PATCH_FLAG = Symbol.for(`${MODULE_ID}.shadowdarkHpAnimationPatched`);
 const HP_ANIMATION_CALL_COUNT = Symbol.for(`${MODULE_ID}.hpAnimationCallCount`);
@@ -100,6 +104,8 @@ Hooks.once("ready", () => {
   installShadowdarkHpAnimationReplacement();
 });
 
+Hooks.on("mkStressChanged", handleStressChanged);
+
 function getTokenHeightPx(token) {
   const placeableHeight = Number(token?.h);
   if (Number.isFinite(placeableHeight) && placeableHeight > 0) {
@@ -115,13 +121,13 @@ function getTokenHeightPx(token) {
 /*  Standalone Bouncing Text                */
 /* ---------------------------------------- */
 
-function createBouncingDamageNumber(token, delta, color) {
+function createBouncingNumber(token, displayText, fill, stroke = 0x000000) {
   const TextClass = foundry.canvas?.containers?.PreciseText;
   const ticker = canvas?.app?.ticker;
 
   if (!TextClass || !ticker || !canvas?.interface || !token?.center) {
     console.error(`${MODULE_ID} | Canvas text animation API was not found.`);
-    return;
+    return false;
   }
 
   const configuredSize = Number(game.settings.get(MODULE_ID, "fontSize"));
@@ -150,15 +156,14 @@ function createBouncingDamageNumber(token, delta, color) {
     game.settings.get(MODULE_ID, "fontFamily") || DEFAULT_FONT
   );
 
-  const value = Math.abs(Math.trunc(delta));
-  const text = new TextClass(String(value), {
+  const text = new TextClass(displayText, {
     align: "center",
     dropShadow: true,
-    fill: color,
+    fill,
     fontFamily,
     fontSize,
     fontWeight: "bold",
-    stroke: 0x000000,
+    stroke,
     strokeThickness: Math.max(3, Math.round(fontSize / 12))
   });
 
@@ -231,6 +236,22 @@ function createBouncingDamageNumber(token, delta, color) {
 
   ACTIVE_ANIMATIONS.add(cleanup);
   ticker.add(tick);
+  return true;
+}
+
+function createBouncingDamageNumber(token, delta, color) {
+  const value = Math.abs(Math.trunc(delta));
+  return createBouncingNumber(token, String(value), color);
+}
+
+function createBouncingStressNumber(token, delta) {
+  const value = Math.abs(Math.trunc(delta));
+  const isGain = delta > 0;
+  const sign = isGain ? "+" : "-";
+  const fill = isGain ? STRESS_GAIN_FILL : STRESS_LOSS_FILL;
+  const stroke = isGain ? STRESS_GAIN_STROKE : STRESS_LOSS_STROKE;
+
+  return createBouncingNumber(token, `${sign}${value}`, fill, stroke);
 }
 
 Hooks.on("canvasTearDown", () => {
@@ -281,9 +302,7 @@ function installShadowdarkHpAnimationReplacement() {
 
     try {
       const isDamage = delta < 0;
-      const tokens = this.isToken
-        ? [this.token]
-        : this.getActiveTokens(true, true);
+      const tokens = getActiveActorTokens(this);
 
       for (const tokenDoc of tokens) {
         if (!tokenDoc?.object) continue;
@@ -347,6 +366,43 @@ function installShadowdarkHpAnimationReplacement() {
   console.log(
     `${MODULE_ID} | Shadowdark HP scrolling text replaced with standalone bouncing numbers.`
   );
+}
+
+function getActiveActorTokens(actor) {
+  if (actor?.isToken) return actor.token ? [actor.token] : [];
+  return actor?.getActiveTokens?.(true, true) ?? [];
+}
+
+function handleStressChanged(actor, newStress, oldStress) {
+  const currentStress = Number(newStress);
+  const previousStress = Number(oldStress);
+  const delta = currentStress - previousStress;
+
+  if (
+    !Number.isFinite(currentStress) ||
+    !Number.isFinite(previousStress) ||
+    !Number.isFinite(delta) ||
+    delta === 0
+  ) {
+    return;
+  }
+
+  try {
+    let accepted = false;
+
+    for (const tokenDoc of getActiveActorTokens(actor)) {
+      const token = tokenDoc?.object;
+      if (!token) continue;
+
+      accepted = createBouncingStressNumber(token, delta) || accepted;
+    }
+
+    // MK Stress uses a false hook result to skip its fallback scrolling text.
+    if (accepted) return false;
+  }
+  catch (error) {
+    console.error(`${MODULE_ID} | MK Stress animation error:`, error);
+  }
 }
 
 function flashTokenRing(tokenDoc, isDamage) {

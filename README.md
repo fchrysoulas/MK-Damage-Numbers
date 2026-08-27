@@ -16,6 +16,7 @@ No additional modules are required.
 ## Features
 
 - Standalone bouncing damage and healing numbers.
+- Bouncing signed Stress changes when the optional MK Stress module is active.
 - Shadowdark's native damage and healing colors.
 - Configurable font family, font size, and vertical origin.
 - Randomized horizontal movement and arc for a less repetitive effect.
@@ -67,6 +68,10 @@ Available world settings:
 
 Shadowdark's own **Animate HP Change** setting remains the master switch. When
 that setting is disabled, MK Damage Numbers does not animate HP changes.
+
+When MK Stress is installed, Stress changes use the same animation settings and
+appear as signed values: gained Stress uses `+N` with black fill and a white
+outline, while lost Stress uses `-N` with white fill and a black outline.
 
 The default animation duration is **1.7 seconds**, with fading beginning after
 **0.85 seconds**.
