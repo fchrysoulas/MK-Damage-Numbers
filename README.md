@@ -11,7 +11,7 @@ No additional modules are required.
 
 - Foundry VTT: v13-v14
 - Shadowdark RPG: v4.0.0 or later
-- Module version: 2.0.2
+- Module version: 2.0.3
 
 ## Features
 

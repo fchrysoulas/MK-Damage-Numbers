@@ -4,6 +4,8 @@ All notable changes to MK Damage Numbers are documented here.
 
 ## Unreleased
 
+## 2.0.3
+
 - Added optional MK Stress integration with signed bouncing `+N` and `-N`
   animations, without adding MK Stress as a required dependency.
 

@@ -3,7 +3,7 @@
 // Replaces Shadowdark's native HP scrolling text with standalone bouncing text.
 
 const MODULE_ID = "mk-damage-numbers";
-const MODULE_VERSION = "2.0.2";
+const MODULE_VERSION = "2.0.3";
 
 const DEFAULT_FONT = "Signika";
 const DEFAULT_FONT_SIZE = 48;
