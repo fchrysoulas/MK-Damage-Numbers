@@ -4,6 +4,9 @@ All notable changes to MK Damage Numbers are documented here.
 
 ## Unreleased
 
+- Added MK Module Hub Metadata Standard v1 metadata for catalog presentation
+  and installed-module health checks.
+
 ## 2.0.3
 
 - Added optional MK Stress integration with signed bouncing `+N` and `-N`

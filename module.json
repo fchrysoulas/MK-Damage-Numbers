@@ -3,13 +3,6 @@
   "title": "MK Damage Numbers",
   "description": "Replaces Shadowdark's native HP scrolling text with standalone bouncing damage and healing numbers, with configurable font, size, and vertical origin.",
   "version": "2.0.3",
-  "url": "https://github.com/fchrysoulas/MK-Damage-Numbers",
-  "manifest": "https://github.com/fchrysoulas/MK-Damage-Numbers/releases/latest/download/module.json",
-  "download": "https://github.com/fchrysoulas/MK-Damage-Numbers/releases/download/v2.0.3/mk-damage-numbers.zip",
-  "bugs": "https://github.com/fchrysoulas/MK-Damage-Numbers/issues",
-  "changelog": "https://github.com/fchrysoulas/MK-Damage-Numbers/releases",
-  "readme": "https://github.com/fchrysoulas/MK-Damage-Numbers/blob/main/README.md",
-  "license": "LICENSE",
   "compatibility": {
     "minimum": "13",
     "verified": "14",
@@ -21,6 +14,27 @@
       "url": "https://github.com/fchrysoulas"
     }
   ],
+  "flags": {
+    "mk-module-hub": {
+      "schemaVersion": 1,
+      "category": "tokens-visuals",
+      "status": "stable",
+      "icon": "fa-solid fa-burst",
+      "summary": "Display configurable bouncing damage and healing numbers for Shadowdark tokens.",
+      "tags": [
+        "Shadowdark",
+        "Damage",
+        "Healing",
+        "Tokens"
+      ],
+      "features": [
+        "Standalone damage numbers",
+        "Healing number display",
+        "Configurable font and size",
+        "Configurable vertical origin"
+      ]
+    }
+  },
   "esmodules": [
     "scripts/bridge.js"
   ],
@@ -34,5 +48,12 @@
         }
       }
     ]
-  }
+  },
+  "url": "https://github.com/fchrysoulas/MK-Damage-Numbers",
+  "manifest": "https://github.com/fchrysoulas/MK-Damage-Numbers/releases/latest/download/module.json",
+  "download": "https://github.com/fchrysoulas/MK-Damage-Numbers/releases/download/v2.0.3/mk-damage-numbers.zip",
+  "bugs": "https://github.com/fchrysoulas/MK-Damage-Numbers/issues",
+  "changelog": "https://github.com/fchrysoulas/MK-Damage-Numbers/releases",
+  "readme": "https://github.com/fchrysoulas/MK-Damage-Numbers/blob/main/README.md",
+  "license": "LICENSE"
 }
