@@ -3,7 +3,7 @@
 // Replaces Shadowdark's native HP scrolling text with standalone bouncing text.
 
 const MODULE_ID = "mk-damage-numbers";
-const MODULE_VERSION = "2.0.3";
+const MODULE_VERSION = "2.0.4";
 
 const DEFAULT_FONT = "Signika";
 const DEFAULT_FONT_SIZE = 48;
@@ -18,6 +18,8 @@ const STRESS_LOSS_STROKE = 0x000000;
 
 const SHADOWDARK_PATCH_FLAG = Symbol.for(`${MODULE_ID}.shadowdarkHpAnimationPatched`);
 const HP_ANIMATION_CALL_COUNT = Symbol.for(`${MODULE_ID}.hpAnimationCallCount`);
+const HP_ANIMATION_LAST_TRANSITION = Symbol.for(`${MODULE_ID}.hpAnimationLastTransition`);
+const HP_ANIMATION_DEDUPE_WINDOW_MS = 1000;
 
 const ACTIVE_ANIMATIONS = new Set();
 const FRAME_MS = 1000 / 60;
@@ -297,6 +299,30 @@ function installShadowdarkHpAnimationReplacement() {
 
     if (!Number.isFinite(delta) || delta === 0) return;
 
+    // A single logical HP update can reach the document callback more than
+    // once when another module retries or re-renders the same update. Shadowdark
+    // passes only the delta, so use the actor's current HP to identify that
+    // exact transition and suppress only an immediate duplicate.
+    const currentHp = Number(this.system?.attributes?.hp?.value);
+    const previousHp = currentHp - delta;
+    if (Number.isFinite(currentHp) && Number.isFinite(previousHp)) {
+      const transitionKey = `${previousHp}:${currentHp}:${delta}`;
+      const now = Date.now();
+      const previous = this[HP_ANIMATION_LAST_TRANSITION];
+
+      if (
+        previous?.key === transitionKey &&
+        now - previous.timestamp < HP_ANIMATION_DEDUPE_WINDOW_MS
+      ) {
+        return;
+      }
+
+      this[HP_ANIMATION_LAST_TRANSITION] = {
+        key: transitionKey,
+        timestamp: now
+      };
+    }
+
     // Preserve Shadowdark's own Animate HP Change world setting.
     if (!game.settings.get("shadowdark", "animateHpChange")) return;
 
@@ -369,8 +395,22 @@ function installShadowdarkHpAnimationReplacement() {
 }
 
 function getActiveActorTokens(actor) {
-  if (actor?.isToken) return actor.token ? [actor.token] : [];
-  return actor?.getActiveTokens?.(true, true) ?? [];
+  const tokens = actor?.isToken
+    ? (actor.token ? [actor.token] : [])
+    : (actor?.getActiveTokens?.(true, true) ?? []);
+  const seen = new Set();
+
+  return tokens.filter(tokenDoc => {
+    const identity = tokenDoc?.uuid
+      ?? tokenDoc?.document?.uuid
+      ?? tokenDoc?.id
+      ?? tokenDoc?.object?.document?.uuid
+      ?? tokenDoc?.object?.id
+      ?? tokenDoc?.object;
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
 }
 
 function handleStressChanged(actor, newStress, oldStress) {

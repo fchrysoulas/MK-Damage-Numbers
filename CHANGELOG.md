@@ -2,10 +2,13 @@
 
 All notable changes to MK Damage Numbers are documented here.
 
-## Unreleased
+## 2.0.4
 
 - Added MK Module Hub Metadata Standard v1 metadata for catalog presentation
   and installed-module health checks.
+- Suppressed duplicate HP animations from repeated Shadowdark update callbacks
+  and duplicate active-token references while preserving separate consecutive
+  damage and healing transitions.
 
 ## 2.0.3
 
